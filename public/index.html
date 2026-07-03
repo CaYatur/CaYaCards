@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#161310" />
+  <title>CaYa Cards — 3D Çok Oyunculu</title>
+  <link rel="icon" href="/cards/svg/wild-1.svg" />
+  <link rel="stylesheet" href="/css/style.css" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "/vendor/three/three.module.js",
+      "three/addons/": "/vendor/three/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <!-- 3D table lives here, behind the UI -->
+  <canvas id="scene"></canvas>
+  <div id="labels"></div>
+
+  <!-- ============ MENU ============ -->
+  <section id="screen-menu" class="screen active">
+    <div class="menu-wrap">
+      <div class="brand">
+        <div class="logo">CaYa<span>·Cards</span></div>
+        <p class="tagline">3D çok oyunculu · masaüstü, tablet ve telefon</p>
+      </div>
+
+      <div class="menu-tabs">
+        <button class="menu-tab active" data-tab="a">🎨 Karakter</button>
+        <button class="menu-tab" data-tab="b">🎮 Oyna</button>
+      </div>
+
+      <div class="card-panel menu-panel tab-a">
+        <div class="menu-col menu-col-a">
+          <label class="field">
+            <span>İsmin</span>
+            <input id="inp-name" type="text" maxlength="14" placeholder="Oyuncu adın" autocomplete="off" />
+          </label>
+          <div class="customizer" id="cz-stage"></div>
+          <div class="cz-options" id="cz-options"></div>
+        </div>
+
+        <div class="menu-col menu-col-b">
+          <div class="menu-actions">
+            <button id="btn-create" class="primary big">Oda Kur</button>
+            <div class="join-row">
+              <input id="inp-code" type="text" maxlength="4" placeholder="ODA KODU" autocomplete="off" />
+              <button id="btn-join" class="ghost">Katıl</button>
+            </div>
+          </div>
+
+          <div class="public-rooms">
+            <div class="ph-head">
+              <h3>Herkese Açık Odalar</h3>
+              <button id="btn-refresh" class="link">yenile</button>
+            </div>
+            <ul id="room-list"><li class="empty">Henüz açık oda yok — ilkini sen kur!</li></ul>
+          </div>
+        </div>
+      </div>
+      <footer class="menu-foot">Kart oynamak için dokun / tıkla · masada gezinmek için sürükle</footer>
+    </div>
+  </section>
+
+  <!-- ============ CREATE DIALOG ============ -->
+  <div id="dlg-create" class="modal">
+    <div class="modal-box">
+      <h2>Yeni Oda</h2>
+      <label class="field"><span>Oda adı</span>
+        <input id="inp-room-name" type="text" maxlength="22" placeholder="CaYa Cards Odam" /></label>
+      <label class="toggle">
+        <input id="chk-public" type="checkbox" checked />
+        <span>Herkese açık (listede görünür)</span>
+      </label>
+      <div class="field"><span>Oyun modu</span>
+        <div id="mode-select" class="mode-select">
+          <button type="button" class="mode-opt sel" data-mode="classic">
+            <b>🎴 Klasik</b><small>Standart kurallar</small>
+          </button>
+          <button type="button" class="mode-opt" data-mode="party">
+            <b>🎉 Eğlence</b><small>Ceza = canlı çizim görevi + oylama</small>
+          </button>
+          <button type="button" class="mode-opt" data-mode="chaos">
+            <b>🌀 Kaos</b><small>7 = el değiştir · 0 = herkes elini devreder</small>
+          </button>
+          <button type="button" class="mode-opt" data-mode="turbo">
+            <b>⚡ Turbo</b><small>5 kart · 15 sn sıra · hızlı botlar</small>
+          </button>
+          <button type="button" class="mode-opt" data-mode="nomercy">
+            <b>☠️ Acımasız</b><small>Eşleşen kart çekene kadar çekersin</small>
+          </button>
+          <button type="button" class="mode-opt" data-mode="wildparty">
+            <b>🃏 Bol Joker</b><small>Destede bir sürü ekstra joker ve +4</small>
+          </button>
+          <button type="button" class="mode-opt" data-mode="doubledeck">
+            <b>🔢 Çift Deste</b><small>İki deste birleşik · 8 kart · uzun oyun</small>
+          </button>
+          <button type="button" class="mode-opt" data-mode="bomb">
+            <b>💣 Bomba</b><small>Kart çekerken deste patlayıp +2 yükleyebilir</small>
+          </button>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button id="btn-create-cancel" class="ghost">Vazgeç</button>
+        <button id="btn-create-go" class="primary">Kur</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ LOBBY ============ -->
+  <section id="screen-lobby" class="screen">
+    <div class="card-panel">
+      <div class="lobby-head">
+        <div>
+          <h2 id="lobby-name">Oda</h2>
+          <div class="code-row">Kod: <b id="lobby-code">----</b>
+            <button id="btn-copy" class="link">kopyala</button>
+            <span id="lobby-vis" class="pill"></span>
+          </div>
+        </div>
+        <button id="btn-leave-lobby" class="ghost sm">Çık</button>
+      </div>
+
+      <ul id="lobby-players" class="player-list"></ul>
+
+      <div class="lobby-actions" id="lobby-actions">
+        <button id="btn-add-bot" class="ghost">+ Bot ekle</button>
+        <button id="btn-start" class="primary big">Başlat</button>
+      </div>
+      <p class="hint" id="lobby-hint">En az 2 oyuncu gerekli.</p>
+    </div>
+  </section>
+
+  <!-- ============ IN-GAME HUD ============ -->
+  <div id="hud" class="hud">
+    <div class="hud-top">
+      <button id="btn-leave-game" class="ghost sm">⟵ Çık</button>
+      <div class="turn-wrap">
+        <div id="turn-banner" class="turn-banner"></div>
+        <div id="turn-timer" class="turn-timer"><i></i></div>
+      </div>
+      <div class="top-right">
+        <button id="btn-mute" class="ghost sm" title="Ses aç/kapat">🔊</button>
+        <button id="btn-cam" class="ghost sm" title="Kamerayı sıfırla">⟳</button>
+      </div>
+    </div>
+
+    <div id="toast-stack" class="toast-stack"></div>
+
+    <!-- color picker for wild cards -->
+    <div id="color-picker" class="color-picker">
+      <h3>Renk seç</h3>
+      <div class="swatches">
+        <button data-c="amber" style="--c:#E0A53D"></button>
+        <button data-c="blue"  style="--c:#4E7FB5"></button>
+        <button data-c="clay"  style="--c:#D9764A"></button>
+        <button data-c="green" style="--c:#6E9457"></button>
+      </div>
+    </div>
+
+    <div class="hud-bottom">
+      <div class="action-rail">
+        <button id="btn-draw" class="action">Kart Çek</button>
+        <button id="btn-pass" class="action hidden">Pas</button>
+        <button id="btn-lastcard" class="action lastcard hidden">Son kart!</button>
+      </div>
+      <div id="hand" class="hand"></div>
+    </div>
+
+    <!-- chat -->
+    <div id="chat" class="chat collapsed">
+      <button id="chat-toggle" class="chat-toggle">💬</button>
+      <div class="chat-body">
+        <div class="chat-head">
+          <span>Sohbet</span>
+          <button id="chat-close" class="chat-close" title="Kapat">✕</button>
+        </div>
+        <div id="chat-log" class="chat-log"></div>
+        <form id="chat-form" autocomplete="off">
+          <input id="chat-input" maxlength="200" placeholder="Mesaj yaz…" autocomplete="off"
+            autocorrect="off" autocapitalize="sentences" spellcheck="false" enterkeyhint="send" name="cayacards-chat-msg" />
+          <button type="submit" id="chat-send" class="chat-send">Gönder</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ RECONNECT / WAITING OVERLAY ============ -->
+  <div id="wait-overlay" class="wait-overlay">
+    <div class="wait-box">
+      <div class="spin"></div>
+      <h3 id="wait-title">Bağlantı bekleniyor…</h3>
+      <p id="wait-msg"></p>
+    </div>
+  </div>
+
+  <!-- ============ FINISHER PICKER (winner chooses the finale) ============ -->
+  <div id="finisher-picker" class="fin-picker">
+    <div class="fin-box">
+      <div class="fin-eyebrow">KAZANDIN</div>
+      <h2 class="fin-title">Bitirişini seç</h2>
+      <p class="fin-sub">Kaybedenler izleyecek. Nasıl kutlayacaksın?</p>
+      <div class="fin-grid" id="fin-grid"></div>
+      <p class="fin-hint" id="fin-hint">30 saniye içinde seç — yoksa podyum otomatik gelir.</p>
+    </div>
+  </div>
+
+  <!-- losers wait while the winner is choosing -->
+  <div id="finisher-wait" class="fin-wait">
+    <div class="fin-wait-box"><span class="fin-spin"></span><b id="fin-wait-name">Kazanan</b> bitirişini seçiyor…</div>
+  </div>
+
+  <!-- ============ WINNER CELEBRATION (podium + confetti + anthem) ============ -->
+  <div id="celebration" class="celebration">
+    <div class="celeb-confetti" id="celeb-confetti"></div>
+    <div class="celeb-top">
+      <div class="celeb-crown">🏆</div>
+      <div class="celeb-title">ŞAMPİYON</div>
+      <div class="celeb-name" id="celeb-name">—</div>
+    </div>
+    <div class="celeb-bottom">
+      <div class="celeb-song">🎵 Çalıyor: <b>TOXIC VICTORY</b> 🎵</div>
+      <button id="celeb-skip" class="celeb-skip">Atla ▶</button>
+    </div>
+  </div>
+
+  <!-- ============ WINNER ============ -->
+  <div id="dlg-winner" class="modal">
+    <div class="modal-box win">
+      <div class="trophy">🏆</div>
+      <h2 id="winner-name">—</h2>
+      <p>oyunu kazandı!</p>
+      <p id="winner-info" class="winner-info"></p>
+      <div class="modal-actions">
+        <button id="btn-back-menu" class="ghost">Menü</button>
+        <button id="btn-rematch" class="primary">Yeniden Oyna</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ PARTY: PENALTY DRAWING TASK ============ -->
+  <div id="task-overlay" class="task-overlay">
+    <div class="task-box">
+      <div class="task-head">
+        <div id="task-title" class="task-title"></div>
+        <div id="task-timer" class="task-timer-num">0</div>
+      </div>
+      <div class="task-canvas-wrap">
+        <canvas id="task-canvas" width="600" height="440" class="task-canvas"></canvas>
+      </div>
+      <div id="task-tools" class="task-tools"></div>
+      <div id="task-foot" class="task-foot"></div>
+    </div>
+  </div>
+
+  <div id="loader" class="loader"><div class="spin"></div><span>Yükleniyor…</span></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html>
